@@ -1,6 +1,7 @@
 package main
 
 import (
+	"secusend/configs"
 	"secusend/routes"
 
 	"flag"
@@ -18,6 +19,9 @@ func main() {
 
 	// Create fiber app
 	app := fiber.New()
+
+	//DB
+	configs.ConnectDB()
 
 	// Middleware
 	app.Use(recover.New())
