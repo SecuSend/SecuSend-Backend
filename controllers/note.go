@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -48,5 +49,27 @@ func PostNote() fiber.Handler {
 
 		// c.Status(fiber.StatusOK)
 		// return c.JSON(fiber.Map{"test": test})
+	}
+}
+
+func GetNote() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		id := c.Query("id")
+		var note models.Note
+		defer cancel()
+
+		objId, _ := primitive.ObjectIDFromHex(id)
+
+		err := noteCollection.FindOne(ctx, bson.M{"id": objId}).Decode(&note)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return c.Status(http.StatusNotFound).JSON(responses.GenericResponse{Status: http.StatusNotFound, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+			} else {
+				return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+			}
+		}
+
+		return c.Status(http.StatusOK).JSON(responses.GenericResponse{Status: http.StatusOK, Message: "success", Data: &fiber.Map{"data": note}})
 	}
 }
