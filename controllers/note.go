@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"log"
-	"net/http"
 	"secusend/configs"
 	"secusend/models"
 	"secusend/responses"
@@ -30,7 +29,7 @@ func CreatetNote() fiber.Handler {
 
 		//validate the request body
 		if err := c.BodyParser(&body); err != nil {
-			return c.Status(http.StatusBadRequest).JSON(responses.GenericResponse{Status: http.StatusBadRequest, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+			return responses.BadRequestResponse(c, err.Error())
 		}
 
 		var data string
@@ -44,7 +43,7 @@ func CreatetNote() fiber.Handler {
 			encrypted, err := services.Encrypt(*body.Password, body.Data) //todo key 32bit
 			if err != nil {
 				log.Println(err)
-				return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+				return responses.InternalServerErrorResponse(c, err.Error())
 			}
 			data = encrypted
 		} else {
@@ -62,10 +61,10 @@ func CreatetNote() fiber.Handler {
 
 		result, err := noteCollection.InsertOne(ctx, newNote)
 		if err != nil {
-			return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+			return responses.InternalServerErrorResponse(c, err.Error())
 		}
 
-		return c.Status(http.StatusCreated).JSON(responses.GenericResponse{Status: http.StatusCreated, Message: "success", Data: &fiber.Map{"data": result}})
+		return responses.OKResponse(c, &fiber.Map{"result": result})
 
 		// c.Status(fiber.StatusOK)
 		// return c.JSON(fiber.Map{"test": test})
@@ -84,7 +83,7 @@ func GetNote() fiber.Handler {
 
 		//validate the request body
 		if err := c.BodyParser(&body); err != nil {
-			return c.Status(http.StatusBadRequest).JSON(responses.GenericResponse{Status: http.StatusBadRequest, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+			return responses.BadRequestResponse(c, err.Error())
 		}
 
 		var note models.Note
@@ -93,9 +92,9 @@ func GetNote() fiber.Handler {
 		err := noteCollection.FindOne(ctx, bson.M{"id": objId}).Decode(&note)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				return c.Status(http.StatusNotFound).JSON(responses.GenericResponse{Status: http.StatusNotFound, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+				return responses.NotFoundResponse(c, err.Error())
 			} else {
-				return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+				return responses.InternalServerErrorResponse(c, err.Error())
 			}
 		}
 
@@ -103,20 +102,20 @@ func GetNote() fiber.Handler {
 
 		if note.PasswordProtected == true {
 			if body.Password != nil && *body.Password != "" {
-				return c.Status(http.StatusForbidden).JSON(responses.GenericResponse{Status: http.StatusForbidden, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+				return responses.UnauthorizedResponse(c, err.Error())
 			}
 
 			//Decrypt the text:
 			decrypted, err := services.Decrypt(*body.Password, note.Data)
 			if err != nil {
 				log.Println(err)
-				return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+				return responses.InternalServerErrorResponse(c, err.Error())
 			}
 			data = decrypted
 		} else {
 			data = note.Data
 		}
 
-		return c.Status(http.StatusOK).JSON(responses.GenericResponse{Status: http.StatusOK, Message: "success", Data: &fiber.Map{"data": data}})
+		return responses.CreatedResponse(c, &fiber.Map{"data": data})
 	}
 }
