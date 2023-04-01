@@ -7,6 +7,6 @@ import (
 )
 
 func NoteRouter(router fiber.Router) {
-	router.Post("/postNote", Controller.PostNote())
-	router.Get("/getNote", Controller.GetNote())
+	router.Post("/createNote", Controller.CreatetNote())
+	router.Post("/getNote", Controller.GetNote())
 }

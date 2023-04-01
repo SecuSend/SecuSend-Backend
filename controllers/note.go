@@ -18,14 +18,14 @@ import (
 
 var noteCollection *mongo.Collection = configs.GetCollection(configs.DB, "note")
 
-func PostNote() fiber.Handler {
+func CreatetNote() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		body := struct {
-			Key  string `json:"key"`
-			Data string `json:"data"`
+			Password *string `json:"password"`
+			Data     string  `json:"data"`
 		}{}
 
 		//validate the request body
@@ -33,19 +33,30 @@ func PostNote() fiber.Handler {
 			return c.Status(http.StatusBadRequest).JSON(responses.GenericResponse{Status: http.StatusBadRequest, Message: "error", Data: &fiber.Map{"data": err.Error()}})
 		}
 
-		//Encrypt the text:
-		encrypted, err := services.Encrypt(body.Key, body.Data) //todo key 32bit
-		if err != nil {
-			log.Println(err)
-			return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+		var data string
+		var passwordProtected bool
+
+		// Check if password is not null or empty
+		if body.Password != nil && *body.Password != "" {
+			passwordProtected = true
+
+			//Encrypt the text with the password:
+			encrypted, err := services.Encrypt(*body.Password, body.Data) //todo key 32bit
+			if err != nil {
+				log.Println(err)
+				return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+			}
+			data = encrypted
+		} else {
+			passwordProtected = false
+			data = body.Data
 		}
-		log.Println(encrypted)
 
 		newNote := models.Note{
 			Id:                primitive.NewObjectID(),
-			Key:               body.Key,
-			Data:              encrypted,
-			PasswordProtected: true,
+			Key:               "test", //todo
+			Data:              data,
+			PasswordProtected: passwordProtected,
 			CreatedAt:         time.Now(),
 		}
 
@@ -64,12 +75,21 @@ func PostNote() fiber.Handler {
 func GetNote() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		id := c.Query("id")
-		var note models.Note
 		defer cancel()
 
-		objId, _ := primitive.ObjectIDFromHex(id)
+		body := struct {
+			Id       string  `json:"id"`
+			Password *string `json:"password"`
+		}{}
 
+		//validate the request body
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(http.StatusBadRequest).JSON(responses.GenericResponse{Status: http.StatusBadRequest, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+		}
+
+		var note models.Note
+
+		objId, _ := primitive.ObjectIDFromHex(body.Id)
 		err := noteCollection.FindOne(ctx, bson.M{"id": objId}).Decode(&note)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -79,13 +99,24 @@ func GetNote() fiber.Handler {
 			}
 		}
 
-		//Decrypt the text:
-		decrypted, err := services.Decrypt(note.Key, note.Data)
-		if err != nil {
-			log.Println(err)
-			return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+		var data string
+
+		if note.PasswordProtected == true {
+			if body.Password != nil && *body.Password != "" {
+				return c.Status(http.StatusForbidden).JSON(responses.GenericResponse{Status: http.StatusForbidden, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+			}
+
+			//Decrypt the text:
+			decrypted, err := services.Decrypt(*body.Password, note.Data)
+			if err != nil {
+				log.Println(err)
+				return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+			}
+			data = decrypted
+		} else {
+			data = note.Data
 		}
 
-		return c.Status(http.StatusOK).JSON(responses.GenericResponse{Status: http.StatusOK, Message: "success", Data: &fiber.Map{"data": decrypted}})
+		return c.Status(http.StatusOK).JSON(responses.GenericResponse{Status: http.StatusOK, Message: "success", Data: &fiber.Map{"data": data}})
 	}
 }
