@@ -2,10 +2,12 @@ package controllers
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"secusend/configs"
 	"secusend/models"
 	"secusend/responses"
+	"secusend/services"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -31,13 +33,20 @@ func PostNote() fiber.Handler {
 			return c.Status(http.StatusBadRequest).JSON(responses.GenericResponse{Status: http.StatusBadRequest, Message: "error", Data: &fiber.Map{"data": err.Error()}})
 		}
 
-		// test := c.Query("test")
+		//Encrypt the text:
+		encrypted, err := services.Encrypt(body.Key, body.Data) //todo key 32bit
+		if err != nil {
+			log.Println(err)
+			return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+		}
+		log.Println(encrypted)
 
 		newNote := models.Note{
-			Id:        primitive.NewObjectID(),
-			Key:       body.Key,
-			Data:      body.Data,
-			CreatedAt: time.Now(),
+			Id:                primitive.NewObjectID(),
+			Key:               body.Key,
+			Data:              encrypted,
+			PasswordProtected: true,
+			CreatedAt:         time.Now(),
 		}
 
 		result, err := noteCollection.InsertOne(ctx, newNote)
@@ -70,6 +79,13 @@ func GetNote() fiber.Handler {
 			}
 		}
 
-		return c.Status(http.StatusOK).JSON(responses.GenericResponse{Status: http.StatusOK, Message: "success", Data: &fiber.Map{"data": note}})
+		//Decrypt the text:
+		decrypted, err := services.Decrypt(note.Key, note.Data)
+		if err != nil {
+			log.Println(err)
+			return c.Status(http.StatusInternalServerError).JSON(responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &fiber.Map{"data": err.Error()}})
+		}
+
+		return c.Status(http.StatusOK).JSON(responses.GenericResponse{Status: http.StatusOK, Message: "success", Data: &fiber.Map{"data": decrypted}})
 	}
 }

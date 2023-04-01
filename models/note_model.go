@@ -7,8 +7,9 @@ import (
 )
 
 type Note struct {
-	Id        primitive.ObjectID `json:"id,omitempty"`
-	Key       string             `json:"key,omitempty" validate:"required"`
-	Data      string             `json:"data,omitempty" validate:"required"`
-	CreatedAt time.Time          `json:"createdat,omitempty" validate:"required"`
+	Id                primitive.ObjectID `json:"id,omitempty"`
+	Key               string             `json:"key,omitempty" validate:"required"`
+	Data              string             `json:"data,omitempty" validate:"required"`
+	PasswordProtected bool               `json:"passwordProtected,omitempty"`
+	CreatedAt         time.Time          `json:"createdAt,omitempty" validate:"required"`
 }
