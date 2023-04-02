@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"log"
 
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -48,21 +47,23 @@ func Encrypt(secret string, message string) (encoded string, err error) {
 		return "", err
 	}
 
-	//Make the cipher text a byte array of size BlockSize + the length of the message
-	cipherText := make([]byte, aes.BlockSize+len(plainText))
+	//Create a new GCM cipher
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
 
-	//iv is the ciphertext up to the blocksize (16)
-	iv := cipherText[:aes.BlockSize]
-	if _, err = io.ReadFull(rand.Reader, iv); err != nil {
+	//Generate a random nonce
+	nonce := make([]byte, aesgcm.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", err
 	}
 
 	//Encrypt the data:
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(cipherText[aes.BlockSize:], plainText)
+	cipherText := aesgcm.Seal(nil, nonce, plainText, nil)
 
 	//Return string encoded in base64
-	return base64.RawStdEncoding.EncodeToString(cipherText), err
+	return base64.RawStdEncoding.EncodeToString(append(nonce, cipherText...)), err
 }
 
 /*
@@ -84,7 +85,6 @@ func Decrypt(secret string, secure string) (decoded string, err error) {
 	if err != nil {
 		return "", err
 	}
-	log.Println(cipherKey)
 
 	//Remove base64 encoding:
 	cipherText, err := base64.RawStdEncoding.DecodeString(secure)
@@ -92,24 +92,30 @@ func Decrypt(secret string, secure string) (decoded string, err error) {
 		return "", err
 	}
 
-	//Create a new AES cipher with the key and encrypted message
+	//Create a new AES-GCM cipher with the key and encrypted message
 	block, err := aes.NewCipher(cipherKey)
 	if err != nil {
 		return "", err
 	}
 
-	//IF the length of the cipherText is less than 16 Bytes:
-	if len(cipherText) < aes.BlockSize {
-		err = errors.New("Ciphertext block size is too short!")
-		return
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
 	}
 
-	iv := cipherText[:aes.BlockSize]
-	cipherText = cipherText[aes.BlockSize:]
+	//IF the length of the cipherText is less than 16 Bytes:
+	if len(cipherText) < gcm.NonceSize() {
+		return "", errors.New("Ciphertext block size is too short!")
+	}
+
+	nonce := cipherText[:gcm.NonceSize()]
+	cipherText = cipherText[gcm.NonceSize():]
 
 	//Decrypt the message
-	stream := cipher.NewCFBDecrypter(block, iv)
-	stream.XORKeyStream(cipherText, cipherText)
+	plainText, err := gcm.Open(nil, nonce, cipherText, nil)
+	if err != nil {
+		return "", err
+	}
 
-	return string(cipherText), err
+	return string(plainText), err
 }

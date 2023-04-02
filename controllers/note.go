@@ -29,7 +29,7 @@ func CreatetNote() fiber.Handler {
 
 		//validate the request body
 		if err := c.BodyParser(&body); err != nil {
-			return responses.BadRequestResponse(c, err.Error())
+			return responses.BadRequestResponse(c, "Parser error")
 		}
 
 		var data string
@@ -43,7 +43,7 @@ func CreatetNote() fiber.Handler {
 			encrypted, err := services.Encrypt(*body.Password, body.Data) //todo key 32bit
 			if err != nil {
 				log.Println(err)
-				return responses.InternalServerErrorResponse(c, err.Error())
+				return responses.InternalServerErrorResponse(c, "Encrypt error")
 			}
 			data = encrypted
 		} else {
@@ -51,9 +51,15 @@ func CreatetNote() fiber.Handler {
 			data = body.Data
 		}
 
+		randomKey, err := services.GenerateUniqueKey()
+		if err != nil {
+			log.Println(err)
+			return responses.InternalServerErrorResponse(c, "Key generation error")
+		}
+
 		newNote := models.Note{
 			Id:                primitive.NewObjectID(),
-			Key:               "test", //todo
+			Key:               randomKey,
 			Data:              data,
 			PasswordProtected: passwordProtected,
 			CreatedAt:         time.Now(),
@@ -61,13 +67,12 @@ func CreatetNote() fiber.Handler {
 
 		result, err := noteCollection.InsertOne(ctx, newNote)
 		if err != nil {
-			return responses.InternalServerErrorResponse(c, err.Error())
+			log.Println(err)
+			return responses.InternalServerErrorResponse(c, "Insertion error")
 		}
+		log.Println(result)
 
-		return responses.OKResponse(c, &fiber.Map{"result": result})
-
-		// c.Status(fiber.StatusOK)
-		// return c.JSON(fiber.Map{"test": test})
+		return responses.CreatedResponse(c, &fiber.Map{"key": newNote.Key})
 	}
 }
 
@@ -77,45 +82,45 @@ func GetNote() fiber.Handler {
 		defer cancel()
 
 		body := struct {
-			Id       string  `json:"id"`
+			Key      string  `json:"key"`
 			Password *string `json:"password"`
 		}{}
 
 		//validate the request body
 		if err := c.BodyParser(&body); err != nil {
-			return responses.BadRequestResponse(c, err.Error())
+			return responses.BadRequestResponse(c, "Parser error")
 		}
 
 		var note models.Note
 
-		objId, _ := primitive.ObjectIDFromHex(body.Id)
-		err := noteCollection.FindOne(ctx, bson.M{"id": objId}).Decode(&note)
+		err := noteCollection.FindOne(ctx, bson.M{"key": body.Key}).Decode(&note)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
-				return responses.NotFoundResponse(c, err.Error())
+				return responses.NotFoundResponse(c, "Key not found!")
 			} else {
-				return responses.InternalServerErrorResponse(c, err.Error())
+				log.Println(err)
+				return responses.InternalServerErrorResponse(c, "DB error")
 			}
 		}
 
 		var data string
 
 		if note.PasswordProtected == true {
-			if body.Password != nil && *body.Password != "" {
-				return responses.UnauthorizedResponse(c, err.Error())
+			if body.Password == nil || *body.Password == "" {
+				return responses.UnauthorizedResponse(c, "Wrong password!")
 			}
 
 			//Decrypt the text:
 			decrypted, err := services.Decrypt(*body.Password, note.Data)
 			if err != nil {
 				log.Println(err)
-				return responses.InternalServerErrorResponse(c, err.Error())
+				return responses.UnauthorizedResponse(c, "Wrong Password!")
 			}
 			data = decrypted
 		} else {
 			data = note.Data
 		}
 
-		return responses.CreatedResponse(c, &fiber.Map{"data": data})
+		return responses.OKResponse(c, &fiber.Map{"data": data})
 	}
 }
