@@ -11,7 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/middleware/csrf"
+	// "github.com/gofiber/fiber/v2/middleware/csrf"
 	"github.com/gofiber/helmet/v2"
 )
 
@@ -30,7 +30,7 @@ func main() {
 	app.Use(logger.New())
 	app.Use(cors.New())
 	app.Use(helmet.New())
-	app.Use(csrf.New())
+	// app.Use(csrf.New())
 	//todo add limiter?
 	//todo add compress?
 

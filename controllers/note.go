@@ -23,9 +23,10 @@ func CreatetNote() fiber.Handler {
 		defer cancel()
 
 		body := struct {
-			Password     *string `json:"password"`
-			Data         string  `json:"data"`
-			SelfDestruct bool    `json:"selfDestruct"`
+			Password     *string    `json:"password"`
+			Data         string     `json:"data"`
+			SelfDestruct bool       `json:"selfDestruct"`
+			ExpireAt     *time.Time `json:"expireAt"`
 		}{}
 
 		//validate the request body
@@ -64,6 +65,7 @@ func CreatetNote() fiber.Handler {
 			Data:              data,
 			PasswordProtected: passwordProtected,
 			SelfDestruct:      body.SelfDestruct,
+			ExpireAt:          body.ExpireAt,
 			CreatedAt:         time.Now(),
 		}
 
@@ -106,6 +108,11 @@ func GetNote() fiber.Handler {
 			}
 		}
 
+		//Expiry
+		if note.ExpireAt != nil && time.Now().After(*note.ExpireAt) {
+			return responses.UnauthorizedResponse(c, "Expired!")
+		}
+
 		var data string
 
 		//Password aes decrypt
@@ -134,6 +141,6 @@ func GetNote() fiber.Handler {
 			}
 		}
 
-		return responses.OKResponse(c, &fiber.Map{"data": data})
+		return responses.OKResponse(c, &fiber.Map{"data": data, "selfDestruct": note.SelfDestruct})
 	}
 }
