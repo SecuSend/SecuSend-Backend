@@ -11,5 +11,7 @@ type Note struct {
 	Key               string             `json:"key,omitempty" validate:"required"`
 	Data              string             `json:"data,omitempty" validate:"required"`
 	PasswordProtected bool               `json:"passwordProtected,omitempty"`
+	SelfDestruct      bool               `json:"selfDestruct,omitempty"`
+	ExpireAt          time.Time          `json:"expireAt,omitempty"`
 	CreatedAt         time.Time          `json:"createdAt,omitempty" validate:"required"`
 }

@@ -23,8 +23,9 @@ func CreatetNote() fiber.Handler {
 		defer cancel()
 
 		body := struct {
-			Password *string `json:"password"`
-			Data     string  `json:"data"`
+			Password     *string `json:"password"`
+			Data         string  `json:"data"`
+			SelfDestruct bool    `json:"selfDestruct"`
 		}{}
 
 		//validate the request body
@@ -62,6 +63,7 @@ func CreatetNote() fiber.Handler {
 			Key:               randomKey,
 			Data:              data,
 			PasswordProtected: passwordProtected,
+			SelfDestruct:      body.SelfDestruct,
 			CreatedAt:         time.Now(),
 		}
 
@@ -93,6 +95,7 @@ func GetNote() fiber.Handler {
 
 		var note models.Note
 
+		//Get the note
 		err := noteCollection.FindOne(ctx, bson.M{"key": body.Key}).Decode(&note)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
@@ -105,6 +108,7 @@ func GetNote() fiber.Handler {
 
 		var data string
 
+		//Password aes decrypt
 		if note.PasswordProtected == true {
 			if body.Password == nil || *body.Password == "" {
 				return responses.UnauthorizedResponse(c, "Wrong password!")
@@ -119,6 +123,15 @@ func GetNote() fiber.Handler {
 			data = decrypted
 		} else {
 			data = note.Data
+		}
+
+		//SelfDestruct
+		if note.SelfDestruct == true {
+			_, err := noteCollection.DeleteOne(ctx, bson.M{"key": body.Key})
+			if err != nil {
+				log.Println(err)
+				return responses.InternalServerErrorResponse(c, "DB error")
+			}
 		}
 
 		return responses.OKResponse(c, &fiber.Map{"data": data})
