@@ -23,15 +23,36 @@ func CreatetNote() fiber.Handler {
 		defer cancel()
 
 		body := struct {
-			Password     *string    `json:"password"`
-			Data         string     `json:"data"`
-			SelfDestruct bool       `json:"selfDestruct"`
-			ExpireAt     *time.Time `json:"expireAt"`
+			Password     *string `json:"password"`
+			Data         string  `json:"data"`
+			SelfDestruct bool    `json:"selfDestruct"`
+			ExpireAfter  *string `json:"expireAfter"`
 		}{}
 
 		//validate the request body
 		if err := c.BodyParser(&body); err != nil {
 			return responses.BadRequestResponse(c, "Parser error")
+		}
+
+		//Expiry
+		var expireAt *time.Time
+		if body.ExpireAfter != nil && *body.ExpireAfter != "" {
+			expire := time.Now()
+			switch *body.ExpireAfter {
+			case "1y":
+				expire = expire.AddDate(1, 0, 0)
+			case "1m":
+				expire = expire.AddDate(0, 1, 0)
+			case "1w":
+				expire = expire.AddDate(0, 0, 7)
+			case "1d":
+				expire = expire.AddDate(0, 0, 1)
+			case "1h":
+				expire = expire.Add(time.Hour * 1)
+			default:
+				expire = expire.AddDate(1, 0, 0)
+			}
+			expireAt = &expire
 		}
 
 		var data string
@@ -53,22 +74,25 @@ func CreatetNote() fiber.Handler {
 			data = body.Data
 		}
 
+		//Create key id
 		randomKey, err := services.GenerateUniqueKey()
 		if err != nil {
 			log.Println(err)
 			return responses.InternalServerErrorResponse(c, "Key generation error")
 		}
 
+		//Create note model
 		newNote := models.Note{
 			Id:                primitive.NewObjectID(),
 			Key:               randomKey,
 			Data:              data,
 			PasswordProtected: passwordProtected,
 			SelfDestruct:      body.SelfDestruct,
-			ExpireAt:          body.ExpireAt,
+			ExpireAt:          expireAt,
 			CreatedAt:         time.Now(),
 		}
 
+		//Insert in DB
 		result, err := noteCollection.InsertOne(ctx, newNote)
 		if err != nil {
 			log.Println(err)
@@ -110,7 +134,13 @@ func GetNote() fiber.Handler {
 
 		//Expiry
 		if note.ExpireAt != nil && time.Now().After(*note.ExpireAt) {
-			return responses.UnauthorizedResponse(c, "Expired!")
+			//TODO : Cron to delete expired entries
+			_, err := noteCollection.DeleteOne(ctx, bson.M{"key": body.Key})
+			if err != nil {
+				log.Println(err)
+				return responses.InternalServerErrorResponse(c, "DB error")
+			}
+			return responses.NotFoundResponse(c, "Key not found!")
 		}
 
 		var data string
