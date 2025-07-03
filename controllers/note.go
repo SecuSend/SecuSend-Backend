@@ -142,7 +142,6 @@ func GetNote() fiber.Handler {
 
 		//Expiry
 		if note.ExpireAt != nil && time.Now().After(*note.ExpireAt) {
-			//TODO : Cron to delete expired entries
 			_, err := noteCollection.DeleteOne(ctx, bson.M{"key": body.Key})
 			if err != nil {
 				log.Println(err)

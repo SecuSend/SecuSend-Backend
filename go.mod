@@ -7,6 +7,8 @@ require (
 	go.mongodb.org/mongo-driver v1.17.4
 )
 
+require github.com/robfig/cron/v3 v3.0.1
+
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/gofiber/fiber/v2 v2.52.8

@@ -5,6 +5,7 @@ import (
 	"log"
 	"secusend/configs"
 	"secusend/routes"
+	"secusend/services"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -24,6 +25,9 @@ func main() {
 
 	//DB
 	configs.ConnectDB()
+
+	// Cron jobs
+	services.StartCronJobs()
 
 	// Middleware
 	app.Use(limiter.New(limiter.Config{
