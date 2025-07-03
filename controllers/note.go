@@ -34,6 +34,11 @@ func CreatetNote() fiber.Handler {
 			return responses.BadRequestResponse(c, "Parser error")
 		}
 
+		// Check if the data size exceeds the limit
+		if len(body.Data) > 32*1024 {
+			return responses.BadRequestResponse(c, "Data size exceeds the limit of 32KB")
+		}
+
 		//Expiry
 		var expireAt *time.Time
 		if body.ExpireAfter != nil && *body.ExpireAfter != "" {
@@ -50,7 +55,7 @@ func CreatetNote() fiber.Handler {
 			case "1h":
 				expire = expire.Add(time.Hour * 1)
 			default:
-				expire = expire.AddDate(1, 0, 0)
+				expire = expire.AddDate(0, 0, 7)
 			}
 			expireAt = &expire
 		}
@@ -60,6 +65,9 @@ func CreatetNote() fiber.Handler {
 
 		// Check if password is not null or empty
 		if body.Password != nil && *body.Password != "" {
+			if len(*body.Password) > 64 {
+				return responses.BadRequestResponse(c, "Password exceeds the limit of 64 characters")
+			}
 			passwordProtected = true
 
 			//Encrypt the text with the password:
