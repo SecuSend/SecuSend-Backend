@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"secusend/configs"
 	"secusend/routes"
 	"secusend/services"
 	"time"
@@ -22,9 +21,6 @@ func main() {
 
 	// Create fiber app
 	app := fiber.New()
-
-	//DB
-	configs.ConnectDB()
 
 	// Cron jobs
 	services.StartCronJobs()
