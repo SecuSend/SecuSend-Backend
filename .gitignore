@@ -25,3 +25,5 @@ dist
 .qodo
 
 secusend
+
+build-docker.sh

@@ -20,7 +20,9 @@ func main() {
 	flag.Parse()
 
 	// Create fiber app
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		ProxyHeader: fiber.HeaderXForwardedFor, //Reverse proxy
+	})
 
 	// Cron jobs
 	services.StartCronJobs()
