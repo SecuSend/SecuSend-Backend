@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -39,8 +40,8 @@ func main() {
 	app.Use(logger.New())
 	app.Use(cors.New())
 	app.Use(helmet.New())
+	app.Use(compress.New())
 	// app.Use(csrf.New())
-	//todo add compress?
 
 	// Routes
 	app.Get("/", HealthCheck)
